@@ -11,7 +11,7 @@ Please read it carefully before contributing, or feed it to your favorite AI ass
 1. **Install dev dependencies**
 
    ```bash
-   pip install -e '.[dev]"
+   pip install -e ".[dev]"
    ```
 
 2. **Format & lint**
