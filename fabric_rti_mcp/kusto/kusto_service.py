@@ -23,16 +23,35 @@ class KustoConnectionWrapper(KustoConnection):
         self.description = description or cluster_uri
 
 
+DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+
+
 class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
     def __init__(self) -> None:
         super().__init__()
         default_cluster = os.getenv("KUSTO_SERVICE_URI")
         default_db = os.getenv(
             "KUSTO_SERVICE_DEFAULT_DB",
-            KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME,
+            DEFAULT_DB,
         )
         if default_cluster:
-            add_kusto_cluster(default_cluster, default_db, "default cluster")
+            self.add_cluster(default_cluster, default_db, "default cluster")
+
+    def add_cluster(
+        self,
+        cluster_uri: str,
+        default_database: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        cluster_uri = cluster_uri.strip()
+        if cluster_uri.endswith("/"):
+            cluster_uri = cluster_uri[:-1]
+
+        if cluster_uri in self:
+            return
+        self[cluster_uri] = KustoConnectionWrapper(
+            cluster_uri, default_database or DEFAULT_DB, description
+        )
 
     def __missing__(self, key: str) -> KustoConnectionWrapper:
         client = KustoConnectionWrapper(key, DEFAULT_DB)
@@ -40,8 +59,7 @@ class KustoConnectionCache(defaultdict[str, KustoConnectionWrapper]):
         return client
 
 
-KUSTO_CONNECTION_CACHE: Dict[str, KustoConnectionWrapper] = KustoConnectionCache()
-DEFAULT_DB = KustoConnectionStringBuilder.DEFAULT_DATABASE_NAME
+KUSTO_CONNECTION_CACHE: KustoConnectionCache = KustoConnectionCache()
 
 
 def add_kusto_cluster(
@@ -49,15 +67,7 @@ def add_kusto_cluster(
     default_database: Optional[str] = None,
     description: Optional[str] = None,
 ) -> None:
-    cluster_uri = cluster_uri.strip()
-    if cluster_uri.endswith("/"):
-        cluster_uri = cluster_uri[:-1]
-
-    if cluster_uri in KUSTO_CONNECTION_CACHE:
-        return
-    KUSTO_CONNECTION_CACHE[cluster_uri] = KustoConnectionWrapper(
-        cluster_uri, default_database or DEFAULT_DB, description
-    )
+    KUSTO_CONNECTION_CACHE.add_cluster(cluster_uri, default_database, description)
 
 
 def get_kusto_connection(cluster_uri: str) -> KustoConnectionWrapper:
